@@ -547,6 +547,16 @@ def _expand_rrule(
 
 # ── Routes ──
 
+def _bind_request_tz(request: Request) -> None:
+    """Apply X-Tz-Offset from the browser so naive datetimes match the user clock."""
+    try:
+        hdr = request.headers.get("x-tz-offset")
+        if hdr is not None:
+            set_user_tz_offset(hdr)
+    except Exception:
+        pass
+
+
 def setup_calendar_routes() -> APIRouter:
     router = APIRouter(prefix="/api/calendar", tags=["calendar"])
 
@@ -783,6 +793,7 @@ def setup_calendar_routes() -> APIRouter:
 
     @router.post("/events")
     async def create_event(request: Request, data: EventCreate):
+        _bind_request_tz(request)
         owner = _require_user(request)
         db = SessionLocal()
         try:
@@ -851,6 +862,7 @@ def setup_calendar_routes() -> APIRouter:
 
     @router.put("/events/{uid}")
     async def update_event(request: Request, uid: str, data: EventUpdate):
+        _bind_request_tz(request)
         owner = _require_user(request)
         try:
             base_uid = _resolve_base_uid(uid)
@@ -1199,6 +1211,7 @@ def setup_calendar_routes() -> APIRouter:
         "tomorrow", "next Tuesday", "in 30 minutes" resolve correctly.
         Uses the "utility" endpoint (small / fast model) to keep latency low.
         """
+        _bind_request_tz(request)
         _require_user(request)
         from src.endpoint_resolver import resolve_endpoint
         from src.llm_core import llm_call_async

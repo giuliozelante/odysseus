@@ -99,12 +99,12 @@ services:
         fi
         exec /usr/local/searxng/entrypoint.sh
     ports:
-      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:8088:8080"
     volumes:
       - searxng-data:/etc/searxng
       - ./config/searxng/settings.yml:/tmp/searxng-settings.yml.template:ro,z
     environment:
-      - SEARXNG_BASE_URL=http://localhost:8080/
+      - SEARXNG_BASE_URL=http://localhost:8088/
       - SEARXNG_SECRET=${SEARXNG_SECRET:-}
     # The official searxng image runs as the non-root `searxng` user, but its
     # entrypoint still needs to chown /etc/searxng on first boot, drop privs via
@@ -132,11 +132,11 @@ services:
     image: docker.io/binwiederhier/ntfy
     command: serve
     ports:
-      - "${NTFY_BIND:-127.0.0.1}:8091:80"
+      - "${NTFY_BIND:-127.0.0.1}:8092:80"
     volumes:
       - ntfy-cache:/var/cache/ntfy
     environment:
-      - NTFY_BASE_URL=${NTFY_BASE_URL:-http://localhost:8091}
+      - NTFY_BASE_URL=${NTFY_BASE_URL:-http://localhost:8092}
     restart: unless-stopped
 
 volumes:

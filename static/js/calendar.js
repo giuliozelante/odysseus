@@ -14,7 +14,7 @@ import {
   _trashIcon, _moreIcon, _bellIcon,
   _isCalBgImage, _calBgImageUrl, _calBgCss,
   _calReadableTextColor,
-  _ds, _addDays, _shiftDT, _tzOffset, _localDateOf,
+  _ds, _addDays, _shiftDT, _tzOffset, _tzOffsetMinutes, _calFetchHeaders, _localDateOf,
 } from './calendar/utils.js';
 
 const API_BASE = window.location.origin;
@@ -34,7 +34,7 @@ function _pickCalBgImage() {
       const fd = new FormData();
       fd.append('files', file);
       try {
-        const res = await fetch(`${API_BASE}/api/upload`, { method: 'POST', body: fd, credentials: 'same-origin' });
+        const res = await fetch(`${API_BASE}/api/upload`, { method: 'POST', body: fd, credentials: 'same-origin', headers: _calFetchHeaders() });
         const data = await res.json();
         const fileId = data.files?.[0]?.id;
         if (!fileId) throw new Error('Upload failed');
@@ -117,7 +117,7 @@ async function _fetchEvents(start, end, force) {
   // Render from pool immediately if we have any cached data
   const hasCache = Object.keys(_allEvents).length > 0;
   if (hasCache) _events = _filterPool(start, end);
-  const fetchPromise = fetch(`${API_BASE}/api/calendar/events?start=${start}&end=${end}`, { credentials: 'same-origin' })
+  const fetchPromise = fetch(`${API_BASE}/api/calendar/events?start=${start}&end=${end}`, { credentials: 'same-origin', headers: _calFetchHeaders() })
     .then(r => {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.json();
@@ -158,7 +158,7 @@ function _prefetchAdjacent() {
   // Fire all prefetches in parallel, ignore failures
   for (const [s, e] of ranges) {
     if (_rangeIsCached(s, e)) continue;
-    fetch(`${API_BASE}/api/calendar/events?start=${s}&end=${e}`, { credentials: 'same-origin' })
+    fetch(`${API_BASE}/api/calendar/events?start=${s}&end=${e}`, { credentials: 'same-origin', headers: _calFetchHeaders() })
       .then(r => {
         if (!r.ok) throw new Error('HTTP ' + r.status);
         return r.json();
@@ -179,7 +179,7 @@ let _caldavSyncedOnce = false;
 async function _fetchCalendars() {
   _calendarsError = null;
   try {
-    const res = await fetch(`${API_BASE}/api/calendar/calendars`, { credentials: 'same-origin' });
+    const res = await fetch(`${API_BASE}/api/calendar/calendars`, { credentials: 'same-origin', headers: _calFetchHeaders() });
     const data = await res.json();
     _calendars = data.calendars || [];
     if (data.error) _calendarsError = data.error;
@@ -203,7 +203,7 @@ async function _fetchCalendars() {
 async function _syncCaldav(interactive) {
   try {
     const res = await fetch(`${API_BASE}/api/calendar/sync`, {
-      method: 'POST', credentials: 'same-origin',
+      method: 'POST', credentials: 'same-origin', headers: _calFetchHeaders(),
     });
     const data = await res.json().catch(() => ({}));
     if (interactive) return data;
@@ -250,7 +250,7 @@ async function _createEvent(data) {
   _allEvents[tempUid] = _optimisticEvent(data, tempUid);
   fetch(`${API_BASE}/api/calendar/events`, {
     method: 'POST', credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+    headers: _calFetchHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(data),
   }).then(async r => {
     if (!r.ok) throw new Error('HTTP ' + r.status);
     return r.json();
@@ -280,7 +280,7 @@ async function _updateEvent(uid, data) {
   const isRecurring = uid.includes('::');
   fetch(`${API_BASE}/api/calendar/events/${encodeURIComponent(uid)}`, {
     method: 'PUT', credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+    headers: _calFetchHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(data),
   }).then(r => {
     if (!r.ok) throw new Error('HTTP ' + r.status);
     if (isRecurring) {
@@ -303,7 +303,7 @@ async function _deleteEvent(uid) {
   delete _allEvents[uid];
   const isRecurring = uid.includes('::');
   fetch(`${API_BASE}/api/calendar/events/${encodeURIComponent(uid)}`, {
-    method: 'DELETE', credentials: 'same-origin',
+    method: 'DELETE', credentials: 'same-origin', headers: _calFetchHeaders(),
   }).then(r => {
     if (!r.ok) throw new Error('HTTP ' + r.status);
     if (isRecurring) {
@@ -499,7 +499,7 @@ async function _createEventReminder(ev, dueDate) {
   };
   try {
     const res = await fetch(`/api/notes`, {
-      method: 'POST', credentials: 'same-origin',
+      method: 'POST', credentials: 'same-origin', headers: _calFetchHeaders(),
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
@@ -1879,7 +1879,7 @@ function _wireAll(body) {
         const res = await fetch(`${API_BASE}/api/calendar/quick-parse`, {
           method: 'POST',
           credentials: 'same-origin',
-          headers: { 'Content-Type': 'application/json' },
+          headers: _calFetchHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({ text, tz }),
         });
         const data = await res.json().catch(() => ({}));
@@ -2437,7 +2437,7 @@ async function _showCalSettings() {
     btn.disabled = true;
     const color = COLORS[_calendars.length % COLORS.length];
     try {
-      const r = await fetch(`${API_BASE}/api/calendar/calendars?name=${encodeURIComponent('New calendar')}&color=${encodeURIComponent(color)}`, { method: 'POST', credentials: 'same-origin' });
+      const r = await fetch(`${API_BASE}/api/calendar/calendars?name=${encodeURIComponent('New calendar')}&color=${encodeURIComponent(color)}`, { method: 'POST', credentials: 'same-origin', headers: _calFetchHeaders() });
       const d = await r.json().catch(() => ({}));
       if (!r.ok || !d.ok) throw new Error(d.error || 'Failed to create calendar');
       _calendars.push({ name: d.name, href: d.id, color: d.color });
@@ -2512,7 +2512,7 @@ async function _showCalSettings() {
     try {
       const fd = new FormData();
       fd.append('file', file);
-      const res = await fetch(`${API_BASE}/api/calendar/import`, { method: 'POST', body: fd, credentials: 'same-origin' });
+      const res = await fetch(`${API_BASE}/api/calendar/import`, { method: 'POST', body: fd, credentials: 'same-origin', headers: _calFetchHeaders() });
       // Try JSON first; fall back to text so HTML auth-walls and bare
       // 500s surface something the user can act on instead of the
       // generic "Import failed".

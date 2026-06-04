@@ -143,6 +143,16 @@ export function _tzOffset() {
   return `${sign}${h}:${m}`;
 }
 
+/** Minutes east of UTC — same value the chat API sends as X-Tz-Offset. */
+export function _tzOffsetMinutes() {
+  return -new Date().getTimezoneOffset();
+}
+
+/** Default fetch headers so calendar APIs parse naive times in the user's zone. */
+export function _calFetchHeaders(extra = {}) {
+  return { 'X-Tz-Offset': String(_tzOffsetMinutes()), ...extra };
+}
+
 // For naive datetimes (no tz suffix), display the date portion as written —
 // TimeTree and many sync tools store "local time" without an offset, so
 // re-interpreting them via the user's tz would shift days.
